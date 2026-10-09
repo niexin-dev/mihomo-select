@@ -625,7 +625,7 @@ if [ ! -x /usr/local/bin/mihomo ]; then
     if [ -z "$MIHOMO_URL" ]; then
         echo "未指定 mihomo 下载地址，正在查询 GitHub 最新稳定版..."
         mapfile -t RELEASE_INFO < <(python3 - <<'PY'
-import json, platform, sys
+import json, platform, re, sys
 from urllib.request import Request, urlopen
 
 arch = {"x86_64": "amd64", "aarch64": "arm64", "armv7l": "armv7"}.get(platform.machine())
@@ -635,20 +635,25 @@ request = Request("https://api.github.com/repos/MetaCubeX/mihomo/releases/latest
                  headers={"Accept": "application/vnd.github+json", "User-Agent": "mihomo-select"})
 with urlopen(request, timeout=30) as response:
     release = json.load(response)
-assets = {item["name"]: item["browser_download_url"] for item in release.get("assets", [])}
+assets = {item["name"]: item for item in release.get("assets", [])}
 prefix = f"mihomo-linux-{arch}"
 packages = sorted(name for name in assets if name.startswith(prefix) and name.endswith(".gz"))
 if not packages:
     raise SystemExit(f"最新版本没有 {prefix} 安装包，请手动指定下载地址")
 package = packages[-1]
-checksum_url = assets.get(package + ".sha256") or assets.get(package + ".sha256sum")
-if not checksum_url:
-    raise SystemExit(f"找不到 {package} 的校验文件，请手动指定 SHA-256")
-with urlopen(Request(checksum_url, headers={"User-Agent": "mihomo-select"}), timeout=30) as response:
-    checksum = response.read().decode("utf-8").split()[0]
-if len(checksum) != 64:
+digest = assets[package].get("digest")
+if isinstance(digest, str) and re.fullmatch(r"sha256:[0-9a-fA-F]{64}", digest):
+    checksum = digest[7:]
+else:
+    checksum_asset = assets.get(package + ".sha256") or assets.get(package + ".sha256sum")
+    if not checksum_asset:
+        raise SystemExit(f"找不到 {package} 的有效 SHA-256 校验信息，请手动指定 SHA-256")
+    with urlopen(Request(checksum_asset["browser_download_url"], headers={"User-Agent": "mihomo-select"}), timeout=30) as response:
+        fields = response.read().decode("utf-8").split()
+        checksum = fields[0] if fields else ""
+if not re.fullmatch(r"[0-9a-fA-F]{64}", checksum):
     raise SystemExit("GitHub 返回的 SHA-256 格式无效")
-print(assets[package])
+print(assets[package]["browser_download_url"])
 print(checksum)
 PY
         )

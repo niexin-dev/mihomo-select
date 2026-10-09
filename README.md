@@ -63,6 +63,12 @@ sudo bash ~/.config/mihomo/bootstrap.sh
 自动下载仅支持常见的 `amd64`、`arm64` 和 `armv7` Linux 主机；其他架构或无法访问 GitHub 时，使用
 `--mihomo-url` 和 `--mihomo-sha256` 手动指定安装包。
 
+初始化脚本优先读取 GitHub 发布资产的 SHA-256 校验值；没有有效校验值时，尝试同名 `.sha256` 或
+`.sha256sum` 文件。无法获得有效 SHA-256 时停止安装。
+
+更新本工具后，请重新运行原来的 `--init` 命令（保留原有的 `--subscription-url` 等参数），刷新
+`~/.config/mihomo/bootstrap.sh`，再审阅并执行该脚本。
+
 ## 快捷流程：已有 Mihomo
 
 如果目标主机已经安装并运行 Mihomo，可以跳过 `--init`，直接确认 REST API：
