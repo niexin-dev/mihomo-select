@@ -610,7 +610,7 @@ def setup_locale():
 
 
 ROOT_SCRIPT = r'''#!/usr/bin/env bash
-# 由 mihomo_select.py --init 生成；幂等，可重复运行。
+# 由 mihomo-select --init 生成；幂等，可重复运行。
 set -euo pipefail
 
 TARGET_USER=__USER__
@@ -743,7 +743,7 @@ if ! grep -Eq '^[[:space:]]*secret[[:space:]]*:' "$CONFIG_PATH"; then
     chown "$TARGET_USER:$TARGET_USER" "$API_SECRET_FILE"
     chmod 600 "$API_SECRET_FILE"
 else
-    echo "配置已有 secret；请自行提供该密钥给 mihomo_select.py" >&2
+    echo "配置已有 secret；请自行提供该密钥给 mihomo-select" >&2
 fi
 chown "$TARGET_USER:mihomo" "$CONFIG_PATH"
 chmod 640 "$CONFIG_PATH"
@@ -793,7 +793,7 @@ def run_init(mihomo_url, subscription_url, mihomo_sha256):
     (home / ".config/mihomo").mkdir(parents=True, exist_ok=True)
     bin_dir = home / ".local/bin"
     bin_dir.mkdir(parents=True, exist_ok=True)
-    target = bin_dir / "mihomo_select.py"
+    target = bin_dir / "mihomo-select"
     source = Path(__file__).resolve()
     if source != target.resolve():
         shutil.copy2(source, target)
@@ -812,7 +812,7 @@ def run_init(mihomo_url, subscription_url, mihomo_sha256):
     print("  1) 确保 ~/.local/bin 在 PATH：export PATH=\"$HOME/.local/bin:$PATH\"")
     print("  2) 审阅 root 脚本后，以 root 执行：")
     print("     sudo bash " + str(script_path))
-    print("  3) 运行：mihomo_select.py")
+    print("  3) 运行：mihomo-select")
     print()
     print("  注意：脚本可能包含订阅 URL，仅当前用户可读；执行前请审阅文件内容。")
 

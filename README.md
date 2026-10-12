@@ -20,7 +20,8 @@ cd mihomo-select
 python3 mihomo_select.py --init \
   --subscription-url 'https://example.com/subscription?token=<你的令牌>'
 sudo bash ~/.config/mihomo/bootstrap.sh
-~/.local/bin/mihomo_select.py --secret-file ~/.config/mihomo/api-secret
+export PATH="$HOME/.local/bin:$PATH"
+mihomo-select --secret-file ~/.config/mihomo/api-secret
 ```
 
 执行 `sudo bash` 之前请先审阅 `~/.config/mihomo/bootstrap.sh`。初始化脚本会自动查询 GitHub 最新稳定版、识别
@@ -40,7 +41,7 @@ Mihomo 本身；请先按照 Mihomo 的官方文档安装并启动 Mihomo。
 
 如果目标主机还没有安装 Mihomo，下载项目后按下面的顺序操作：
 
-`--init` 是用户级操作，不会自动使用 root 权限。它会复制脚本并生成
+`--init` 是用户级操作，不会自动使用 root 权限。它会将工具安装为 `~/.local/bin/mihomo-select`，并生成
 `~/.config/mihomo/bootstrap.sh`。先审阅这个文件，确认下载地址、订阅 URL、用户和目录都正确，再执行：
 
 ```bash
@@ -51,7 +52,8 @@ sudo bash ~/.config/mihomo/bootstrap.sh
 `~/.config/mihomo/api-secret`，随后运行：
 
 ```bash
-~/.local/bin/mihomo_select.py --secret-file ~/.config/mihomo/api-secret
+export PATH="$HOME/.local/bin:$PATH"
+mihomo-select --secret-file ~/.config/mihomo/api-secret
 ```
 
 如果配置原本已有 `secret`，初始化脚本不会覆盖它；此时省略 `--secret-file` 让程序交互式输入，或手动把
@@ -71,7 +73,18 @@ sudo bash ~/.config/mihomo/bootstrap.sh
 
 ## 快捷流程：已有 Mihomo
 
-如果目标主机已经安装并运行 Mihomo，可以跳过 `--init`，直接确认 REST API：
+如果目标主机已经安装并运行 Mihomo，可以跳过 `--init`，先安装工具，再确认 REST API。
+
+先在项目目录安装命令：
+
+```bash
+install -Dm755 mihomo_select.py ~/.local/bin/mihomo-select
+export PATH="$HOME/.local/bin:$PATH"
+```
+
+之后可以在任意目录运行 `mihomo-select`，无需输入 `python3` 或 `.py` 后缀。更新工具后重复上述
+`install` 命令即可。若 `~/.local/bin` 尚未加入 PATH，可将上述 `export` 行加入 `~/.bashrc`（Bash）
+或 `~/.zshrc`（Zsh）。
 
 在 Mihomo 配置中确认 API 监听地址和密钥。例如：
 
@@ -90,10 +103,8 @@ ss -lnt | grep ':9090'
 
 启动策略树：
 
-在项目目录执行：
-
 ```bash
-python3 mihomo_select.py --api http://127.0.0.1:9090
+mihomo-select --api http://127.0.0.1:9090
 ```
 
 如果 API 返回 `401`，程序会在终端中安全地提示输入密钥。也可以把密钥放入仅当前用户可读的文件：
@@ -102,7 +113,7 @@ python3 mihomo_select.py --api http://127.0.0.1:9090
 install -d -m 700 ~/.config/mihomo
 install -m 600 /dev/null ~/.config/mihomo/api-secret
 printf '%s\n' '请替换为你的密钥' > ~/.config/mihomo/api-secret
-python3 mihomo_select.py --secret-file ~/.config/mihomo/api-secret
+mihomo-select --secret-file ~/.config/mihomo/api-secret
 ```
 
 添加和切换订阅：
@@ -126,16 +137,16 @@ python3 mihomo_select.py --secret-file ~/.config/mihomo/api-secret
 程序中的 `e` 只会写入 `~/.config/mihomo/env.sh`，不会改变已经打开的 shell。使用命令行时可以这样操作：
 
 ```bash
-python3 mihomo_select.py --env on
+mihomo-select --env on
 source ~/.config/mihomo/env.sh
-python3 mihomo_select.py --env status
-python3 mihomo_select.py --env off
+mihomo-select --env status
+mihomo-select --env off
 ```
 
 也可以让程序直接输出当前 shell 可执行的命令：
 
 ```bash
-eval "$(python3 mihomo_select.py --env on --shell)"
+eval "$(mihomo-select --env on --shell)"
 ```
 
 `eval` 只应执行本机脚本的输出，不要把不可信程序的输出交给 `eval`。
