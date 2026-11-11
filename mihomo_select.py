@@ -127,7 +127,7 @@ def flatten(roots, group_names, proxies, delays, expanded, pages, limit):
         item = proxies[name]
         children = [x for x in item.get("all", []) if isinstance(x, str)]
         if children and all(x in delays for x in children):
-            children.sort(key=lambda x: (delays[x], x))
+            children.sort(key=lambda x: (delays[x] if isinstance(delays[x], int) else float("inf"), x))
         key = tuple(path)
         total = max(1, -(-len(children) // limit))
         page = min(pages.get(key, 0), total - 1)
@@ -160,7 +160,9 @@ def row_text(row, width):
         page = f"  [{row['page'] + 1}/{row['pages']}]" if row["expanded"] and row["pages"] > 1 else ""
         current = f"  [当前：{row['current']}]" if row["current"] else ""
         return clip(f"{prefix}{branch}{arrow} {row['name']}{page}{current}", width)
-    delay = f"{row['delay']} ms" if isinstance(row["delay"], int) else "未测"
+    value = row["delay"]
+    delay = (f"{value} ms" if isinstance(value, int) else
+             f"失败：{value}" if isinstance(value, str) else "未测")
     current = "  [当前]" if row["current"] else ""
     return clip(f"{prefix}{branch}{row['name']}  {delay:>7}{current}", width)
 
@@ -472,7 +474,8 @@ def tree_ui(roots, group_names, proxies, fetch_proxies, api, proxy_url, socks_pr
                 stdscr.addnstr(screen, 0, row_text(row, width), width - 1, attr)
             focus = rows[selected]
             path = " → ".join(focus["path"])
-            stdscr.addnstr(height - 2, 0, clip("路径：" + path, width), width - 1, curses.A_DIM)
+            detail = "失败：" + focus["delay"] if isinstance(focus.get("delay"), str) else "路径：" + path
+            stdscr.addnstr(height - 2, 0, clip(detail, width), width - 1, curses.A_DIM)
             stdscr.addnstr(height - 1, 0, clip("j/k 移动  h/l 折叠展开  n/p 组内翻页  Ctrl-f/Ctrl-b 翻屏  g/G 首尾  Enter 切换/展开  r 测试当前  R 测试全部  s 订阅  e 环境  q 退出", width), width - 1, curses.A_DIM)
             if hard_redraw:
                 stdscr.redrawwin()
@@ -935,9 +938,28 @@ def main():
         return parse.urlencode({"url": args.test_url, "timeout": args.timeout, "expected": "204"})
 
     def test_node(name):
-        result = api("/proxies/" + parse.quote(name, safe="") + "/delay?" + delay_query())
-        value = result.get("delay")
-        return ({name: value}, 0) if isinstance(value, int) else ({}, 1)
+        try:
+            result = api("/proxies/" + parse.quote(name, safe="") + "/delay?" + delay_query())
+            value = result.get("delay")
+            if isinstance(value, int):
+                return {name: value}, 0
+            message = result.get("message")
+            if not isinstance(message, str) or not message.strip():
+                message = "API 未返回有效延迟"
+        except error.HTTPError as exc:
+            message = f"HTTP {exc.code}：{exc.reason}"
+            try:
+                detail = json.load(exc)
+                if isinstance(detail, dict) and isinstance(detail.get("message"), str) and detail["message"].strip():
+                    message = f"HTTP {exc.code}：{detail['message']}"
+            except (OSError, ValueError):
+                pass
+            finally:
+                exc.close()
+        except (OSError, ValueError) as exc:
+            message = str(exc)
+        message = " ".join("".join(char if char.isprintable() else " " for char in message).split())
+        return {name: message or "测速失败（未提供原因）"}, 1
 
     def test_group(name):
         result = api("/group/" + parse.quote(name, safe="") + "/delay?" + delay_query())
@@ -957,12 +979,9 @@ def main():
         with ThreadPoolExecutor(max_workers=min(8, len(nodes) or 1)) as pool:
             futures = [pool.submit(test_node, name) for name in nodes]
             for future in as_completed(futures):
-                try:
-                    values, node_failures = future.result()
-                    result.update(values)
-                    failures += node_failures
-                except (OSError, ValueError, error.HTTPError):
-                    failures += 1
+                values, node_failures = future.result()
+                result.update(values)
+                failures += node_failures
         return result, failures
 
     return tree_ui(groups, group_names, proxies, fetch_proxies, api, proxy_url,
